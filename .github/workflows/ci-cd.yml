@@ -35,12 +35,12 @@ jobs:
         run: |
           # Deployment script here
 
-      - name: Send Slack Notification
+      - name: Send Slack Notification (Success)
         if: success()
         run: |
-          curl -X POST -H 'Content-type: application/json' --data '{"text":"Deployment to production was successful!"}' https://hooks.slack.com/services/your/slack/webhook
+          curl -X POST -H 'Content-type: application/json' --data '{"text":"Deployment to production was successful!"}' ${{ secrets.SLACK_SUCCESS_WEBHOOK }}
 
       - name: Send Failure Notification
         if: failure()
         run: |
-          curl -X POST -H 'Content-type: application/json' --data '{"text":"The deployment failed! Check the logs."}' https://hooks.slack.com/services/your/slack/webhook
+          curl -X POST -H 'Content-type: application/json' --data '{"text":"The deployment failed! Check the logs."}' ${{ secrets.SLACK_FAILURE_WEBHOOK }}
