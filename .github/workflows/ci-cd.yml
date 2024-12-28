@@ -20,15 +20,27 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
+          pip show pytest  # Verify pytest is installed
 
       - name: Run tests
         run: |
-          pytest
+          pytest  # Run the tests
+
+      - name: List files
+        run: |
+          ls -R  # List all files to verify directory structure
 
       - name: Deploy
         if: success()
         run: |
           # Deployment script here
 
+      - name: Send Slack Notification
+        if: success()
+        run: |
+          curl -X POST -H 'Content-type: application/json' --data '{"text":"Deployment to production was successful!"}' https://hooks.slack.com/services/your/slack/webhook
 
-
+      - name: Send Failure Notification
+        if: failure()
+        run: |
+          curl -X POST -H 'Content-type: application/json' --data '{"text":"The deployment failed! Check the logs."}' https://hooks.slack.com/services/your/slack/webhook
