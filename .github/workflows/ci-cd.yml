@@ -19,7 +19,6 @@ jobs:
 
       - name: Install dependencies
         run: |
-          cd python-backend  # Navigate to your backend directory
           pip install -r requirements.txt
           pip show pytest  # Verify pytest is installed
 
