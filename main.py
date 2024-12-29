@@ -4,7 +4,8 @@ from routes import router  # Import the router from routes.py
 from database import Base, engine
 
 # Create the FastAPI app
-app = FastAPI()
+app = FastAPI(docs_url="/docs")
+
 
 # Allow all origins for testing
 app.add_middleware(
