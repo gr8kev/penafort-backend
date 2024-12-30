@@ -69,3 +69,22 @@ def login(email: EmailStr = Form(...), password: str = Form(...), db: Session = 
     token = "jwt-token-placeholder"
 
     return {"message": "Login successful", "token": token}
+
+# Get list of users route
+@router.get("/users", tags=["Users"])
+def get_users(db: Session = Depends(get_db)):
+    """
+    Fetch a list of all users.
+    """
+    users = db.query(User).all()
+    user_list = [
+        {
+            "id": user.id,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "email": user.email,
+            "phone_number": user.phone_number,
+        }
+        for user in users
+    ]
+    return {"total_users": len(users), "users": user_list}
