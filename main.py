@@ -1,6 +1,6 @@
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware  # Add the import for CORSMiddleware
-from routes import router  # Import the router from routes.py
+from fastapi.middleware.cors import CORSMiddleware  
+from routes import router  
 from database import Base, engine
 
 # Create the FastAPI app

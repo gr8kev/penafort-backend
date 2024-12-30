@@ -6,7 +6,7 @@ import re
 
 router = APIRouter()
 
-# Utility to validate password complexity
+
 def validate_password(password: str):
     if len(password) < 8:
         raise HTTPException(status_code=400, detail="Password must be at least 8 characters long")
@@ -20,28 +20,28 @@ def validate_password(password: str):
 def register(
     first_name: str = Form(...),
     last_name: str = Form(...),
-    email: EmailStr = Form(...),  # Enforce valid email format
+    email: EmailStr = Form(...),  
     phone_number: str = Form(...),
     password: str = Form(...),
     confirm_password: str = Form(...),
     db: Session = Depends(get_db)
 ):
-    # Check if the passwords match
+    
     if password != confirm_password:
         raise HTTPException(status_code=400, detail="Passwords do not match")
     
-    # Validate password complexity
+    
     validate_password(password)
 
-    # Check if the email is already registered
+    
     existing_user = db.query(User).filter(User.email == email).first()
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
 
-    # Hash the password
+    
     hashed_password = hash_password(password)
 
-    # Create a new user instance
+    
     user = User(
         first_name=first_name,
         last_name=last_name,
@@ -50,27 +50,27 @@ def register(
         password=hashed_password
     )
 
-    # Save the user to the database
+    
     db.add(user)
     db.commit()
     db.refresh(user)
 
     return {"message": "User registered successfully", "user_id": user.id}
 
-# User login route
+
 @router.post("/login")
 def login(email: EmailStr = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
-    # Find the user by email
+    
     user = db.query(User).filter(User.email == email).first()
     if not user or not verify_password(password, user.password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    # Generate a JWT token (example, implement token generation)
+    
     token = "jwt-token-placeholder"
 
     return {"message": "Login successful", "token": token}
 
-# Get list of users route
+
 @router.get("/users", tags=["Users"])
 def get_users(db: Session = Depends(get_db)):
     """
@@ -88,3 +88,8 @@ def get_users(db: Session = Depends(get_db)):
         for user in users
     ]
     return {"total_users": len(users), "users": user_list}
+@router.get("/admin/users", tags=["Admin"])
+def admin_get_users(db: Session = Depends(get_db)):
+    users = db.query(User).all()
+    return [{"id": user.id, "email": user.email} for user in users]
+
