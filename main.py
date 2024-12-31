@@ -1,27 +1,29 @@
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware  
-from routes import router  
-from database import Base, engine
+from fastapi.middleware.cors import CORSMiddleware
+from connect_database import connect_to_database  
+from routes import router as routes_router  
 
-# Create the FastAPI app
+
 app = FastAPI(docs_url="/docs")
 
 
-# Allow all origins for testing
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  
     allow_credentials=True,
-    allow_methods=["*"],  
-    allow_headers=["*"],  
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
-app.include_router(router)
+@app.on_event("startup")
+def startup():
+    connect_to_database()
 
 
-Base.metadata.create_all(bind=engine)
+app.include_router(routes_router, prefix="/api", tags=["Authentication"])
 
+# Root endpoint (for testing the app)
 @app.get("/")
 def read_root():
     return {"message": "Hello from FastAPI!"}

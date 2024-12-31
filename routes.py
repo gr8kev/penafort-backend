@@ -1,95 +1,72 @@
-from fastapi import APIRouter, Depends, HTTPException, Form
-from sqlalchemy.orm import Session
-from database import get_db, User, hash_password, verify_password
+from fastapi import APIRouter, HTTPException, Form
 from pydantic import EmailStr
-import re
+from database import create_user, get_user, verify_password  
+from jose import JWTError, jwt
+from datetime import datetime, timedelta
+import os
+from dotenv import load_dotenv
+
+
+load_dotenv()
 
 router = APIRouter()
 
+# Environment variables
+SECRET_KEY = os.getenv("SECRET_KEY", "default_fallback_key")  
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
-def validate_password(password: str):
-    if len(password) < 8:
-        raise HTTPException(status_code=400, detail="Password must be at least 8 characters long")
-    if not re.search(r"[A-Z]", password):
-        raise HTTPException(status_code=400, detail="Password must include at least one uppercase letter")
-    if not re.search(r"\d", password):
-        raise HTTPException(status_code=400, detail="Password must include at least one number")
+# Helper function to create a JWT token
+def create_access_token(data: dict):
+    """Create a JWT token."""
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
 
 # User registration route
 @router.post("/register")
 def register(
     first_name: str = Form(...),
     last_name: str = Form(...),
-    email: EmailStr = Form(...),  
+    email: EmailStr = Form(...),
     phone_number: str = Form(...),
     password: str = Form(...),
     confirm_password: str = Form(...),
-    db: Session = Depends(get_db)
 ):
-    
+    # Check if the passwords match
     if password != confirm_password:
         raise HTTPException(status_code=400, detail="Passwords do not match")
-    
-    
-    validate_password(password)
 
-    
-    existing_user = db.query(User).filter(User.email == email).first()
+    # Check if the user already exists by email
+    existing_user = get_user(email)
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
 
-    
-    hashed_password = hash_password(password)
-
-    
-    user = User(
+    # Create the new user in MongoDB with the hashed password
+    create_user(
+        username=email,  
+        password=password,  
         first_name=first_name,
         last_name=last_name,
         email=email,
-        phone_number=phone_number,
-        password=hashed_password
+        phone_number=phone_number
     )
 
-    
-    db.add(user)
-    db.commit()
-    db.refresh(user)
+    return {"message": "User registered successfully"}
 
-    return {"message": "User registered successfully", "user_id": user.id}
-
-
+# User login route
 @router.post("/login")
-def login(email: EmailStr = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
-    
-    user = db.query(User).filter(User.email == email).first()
-    if not user or not verify_password(password, user.password):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+def login(email: EmailStr = Form(...), password: str = Form(...)):
+    user = get_user(email)
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
 
-    
-    token = "jwt-token-placeholder"
+    if not verify_password(password, user['password']):
+        raise HTTPException(status_code=401, detail="Incorrect password")
 
+    # Generate a JWT token
+    token = create_access_token({"sub": email})
+    
     return {"message": "Login successful", "token": token}
-
-
-@router.get("/users", tags=["Users"])
-def get_users(db: Session = Depends(get_db)):
-    """
-    Fetch a list of all users.
-    """
-    users = db.query(User).all()
-    user_list = [
-        {
-            "id": user.id,
-            "first_name": user.first_name,
-            "last_name": user.last_name,
-            "email": user.email,
-            "phone_number": user.phone_number,
-        }
-        for user in users
-    ]
-    return {"total_users": len(users), "users": user_list}
-@router.get("/admin/users", tags=["Admin"])
-def admin_get_users(db: Session = Depends(get_db)):
-    users = db.query(User).all()
-    return [{"id": user.id, "email": user.email} for user in users]
-
