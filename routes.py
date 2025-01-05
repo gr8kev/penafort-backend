@@ -1,22 +1,22 @@
-from fastapi import APIRouter, HTTPException, Form
+from fastapi import APIRouter, HTTPException, Form, Depends
 from pydantic import EmailStr
-from database import create_user, get_user, verify_password  
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 import os
 from dotenv import load_dotenv
 
+from database import create_user, get_user, verify_password, blacklist_token, is_token_blacklisted  
 
 load_dotenv()
 
 router = APIRouter()
 
-# Environment variables
+
 SECRET_KEY = os.getenv("SECRET_KEY", "default_fallback_key")  
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
-# Helper function to create a JWT token
+
 def create_access_token(data: dict):
     """Create a JWT token."""
     to_encode = data.copy()
@@ -25,7 +25,19 @@ def create_access_token(data: dict):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-# User registration route
+
+def authenticate_token(token: str):
+    """Verify and decode the JWT token."""
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email = payload.get("sub")
+        if email is None or is_token_blacklisted(token):
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+        return email
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+
 @router.post("/register")
 def register(
     first_name: str = Form(...),
@@ -35,16 +47,16 @@ def register(
     password: str = Form(...),
     confirm_password: str = Form(...),
 ):
-    # Check if the passwords match
+    
     if password != confirm_password:
         raise HTTPException(status_code=400, detail="Passwords do not match")
 
-    # Check if the user already exists by email
+    
     existing_user = get_user(email)
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
 
-    # Create the new user in MongoDB with the hashed password
+
     create_user(
         username=email,  
         password=password,  
@@ -56,7 +68,7 @@ def register(
 
     return {"message": "User registered successfully"}
 
-# User login route
+
 @router.post("/login")
 def login(email: EmailStr = Form(...), password: str = Form(...)):
     user = get_user(email)
@@ -66,7 +78,14 @@ def login(email: EmailStr = Form(...), password: str = Form(...)):
     if not verify_password(password, user['password']):
         raise HTTPException(status_code=401, detail="Incorrect password")
 
-    # Generate a JWT token
+    
     token = create_access_token({"sub": email})
     
     return {"message": "Login successful", "token": token}
+
+
+@router.post("/logout")
+def logout(token: str = Depends(authenticate_token)):
+    """Blacklist the token and log the user out."""
+    blacklist_token(token)
+    return {"message": "Logged out successfully"}
